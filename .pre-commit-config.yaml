@@ -1,0 +1,59 @@
+# Builtin hooks ship inside prek. Local hooks run the tools from uv.lock, so each tool has one pinned version.
+default_install_hook_types: [pre-commit, commit-msg, pre-push]
+default_stages: [pre-commit]
+
+repos:
+  - repo: builtin
+    hooks:
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: fix-byte-order-marker
+      - id: check-yaml
+      - id: check-toml
+      - id: check-json
+      - id: check-merge-conflict
+  - repo: local
+    hooks:
+      # git-cliff parses the message with the same parser that makes the changelog.
+      # The empty range HEAD..HEAD checks only the new message, not the history.
+      # git-cliff 2.14.2 panics when it reports a commit from --with-commit, so the
+      # hook prints its own message.
+      - id: conventional-commit
+        name: conventional commit (git-cliff)
+        entry: >-
+          sh -c 'GIT_CLIFF__GIT__REQUIRE_CONVENTIONAL=true
+          uv run --frozen git-cliff --with-commit "$(cat "$1")" HEAD..HEAD >/dev/null 2>&1
+          || { echo "The commit message is not a Conventional Commit: https://www.conventionalcommits.org" >&2; exit 1; }' --
+        language: system
+        stages: [commit-msg]
+      - id: ruff-format
+        name: ruff format
+        entry: uv run --frozen ruff format
+        language: system
+        types: [python]
+      - id: ruff-check
+        name: ruff check
+        entry: uv run --frozen ruff check --fix
+        language: system
+        types: [python]
+      - id: ty
+        name: ty check
+        entry: uv run --frozen ty check
+        language: system
+        types: [python]
+        pass_filenames: false
+      - id: jactionlint
+        name: jactionlint
+        entry: uv run --frozen jactionlint
+        language: system
+        files: ^(\.github/workflows/|skill/templates/github-).*\.ya?ml$
+      - id: pytest
+        name: pytest
+        entry: uv run --frozen pytest -q
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
