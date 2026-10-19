@@ -8,7 +8,7 @@ from pinwise import astgrep
 from pinwise.astgrep import Match
 from pinwise.errors import AstGrepError, GitError, InvalidPinError
 from pinwise.git import ENCODING, ERRORS, SKIP_TRAILER, FileChange, Git
-from pinwise.pin import ID_PATTERN, PIN_FILE, REGISTER_DIR, Pin, PinDir, find_pin_dirs, parse_pin
+from pinwise.pin import REGISTER_DIR, Pin, PinDir, find_pin_dirs, load_pin, parse_pin
 
 type Rule = Literal["E1", "L1", "L2", "L3"]
 
@@ -85,21 +85,15 @@ def _lint_pin(root: Path, git: Git, d: PinDir, diff: Diff) -> Iterator[Finding]:
 
 
 def _load(root: Path, d: PinDir) -> Finding | tuple[Pin, list[Match]]:
-    def invalid(where: str, message: str) -> Finding:
-        return Finding(rule="E1", pin_id=d.id, where=where, message=message)
-
-    if not d.has_valid_id:
-        return invalid(d.path, f"The directory name is not a valid pin id. Use {ID_PATTERN}.")
     try:
-        pin = parse_pin((root / d.pin_file).read_text())
-    except FileNotFoundError:
-        return invalid(d.path, f"The directory has no {PIN_FILE}.")
-    except InvalidPinError as err:
-        return invalid(d.pin_file, f"The pin is not valid: {err}")
-    try:
+        pin = load_pin(root, d)
         return pin, astgrep.scan(root, pin.locate)
+    except InvalidPinError as err:
+        return Finding(rule="E1", pin_id=d.id, where=err.where, message=str(err))
     except AstGrepError as err:
-        return invalid(d.pin_file, f"ast-grep does not accept a locate rule: {err}")
+        return Finding(
+            rule="E1", pin_id=d.id, where=d.pin_file, message=f"ast-grep does not accept a locate rule: {err}"
+        )
 
 
 def _dangling(d: PinDir, pin: Pin, matches: list[Match]) -> Iterator[Finding]:
@@ -146,7 +140,7 @@ def _base_pin(git: Git, d: PinDir, base: str) -> Pin | None:
     if text is None:
         return None
     try:
-        return parse_pin(text)
+        return parse_pin(text, where=d.pin_file)
     except InvalidPinError:
         # The base version is history. Only the current version must be valid.
         return None

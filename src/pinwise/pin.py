@@ -31,7 +31,7 @@ class Pin(BaseModel):
     locate: list[LocateRule] = Field(min_length=1)
 
 
-def parse_pin(text: str) -> Pin:
+def parse_pin(text: str, *, where: str) -> Pin:
     """Parse the text of a pin.yaml file.
 
     Raises:
@@ -40,10 +40,14 @@ def parse_pin(text: str) -> Pin:
     try:
         return Pin.model_validate(yaml.safe_load(text))
     except yaml.YAMLError as err:
-        raise InvalidPinError(str(err)) from err
+        raise InvalidPinError(f"The pin is not valid: {err}", where=where) from err
     except ValidationError as err:
-        problems = "; ".join(f"{'.'.join(map(str, e['loc'])) or '<root>'}: {e['msg']}" for e in err.errors())
-        raise InvalidPinError(problems) from err
+        raise InvalidPinError(f"The pin is not valid: {describe(err)}", where=where) from err
+
+
+def describe(err: ValidationError) -> str:
+    """Return the problems of a validation error on one line, without documentation URLs."""
+    return "; ".join(f"{'.'.join(map(str, e['loc'])) or '<root>'}: {e['msg']}" for e in err.errors())
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -75,3 +79,18 @@ def find_pin_dirs(root: Path) -> list[PinDir]:
     if not register.is_dir():
         return []
     return [PinDir(id=p.name) for p in sorted(register.iterdir()) if p.is_dir()]
+
+
+def load_pin(root: Path, d: PinDir) -> Pin:
+    """Read and parse the pin of a pin directory.
+
+    Raises:
+        InvalidPinError: The id is not valid, pin.yaml is missing, or pin.yaml is not valid.
+    """
+    if not d.has_valid_id:
+        raise InvalidPinError(f"The directory name is not a valid pin id. Use {ID_PATTERN}.", where=d.path)
+    try:
+        text = (root / d.pin_file).read_text()
+    except FileNotFoundError as err:
+        raise InvalidPinError(f"The directory has no {PIN_FILE}.", where=d.path) from err
+    return parse_pin(text, where=d.pin_file)

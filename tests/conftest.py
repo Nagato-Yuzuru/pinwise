@@ -84,13 +84,20 @@ class Repo:
         self.git("add", "-A")
         self.git("commit", "-q", "-m", message)
 
-    def lint(self, *args: str) -> Result:
+    def write_check(self, pin_id: str, script: str) -> None:
+        """Write an executable shell check for the pin."""
+        rel = f"pinwise/{pin_id}/check"
+        self.write(rel, f"#!/bin/sh\n{script}\n")
+        (self.path / rel).chmod(0o755)
+
+    def pinwise(self, *args: str) -> Result:
         binary = shutil.which("pinwise", path=sysconfig.get_path("scripts"))
         assert binary is not None
-        done = subprocess.run(
-            [binary, "lint", *args], cwd=self.path, env=GIT_ENV, capture_output=True, text=True, check=False
-        )
+        done = subprocess.run([binary, *args], cwd=self.path, env=GIT_ENV, capture_output=True, text=True, check=False)
         return Result(code=done.returncode, stdout=done.stdout, stderr=done.stderr)
+
+    def lint(self, *args: str) -> Result:
+        return self.pinwise("lint", *args)
 
 
 @pytest.fixture

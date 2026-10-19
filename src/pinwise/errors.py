@@ -11,4 +11,8 @@ class AstGrepError(PinwiseError):
 
 
 class InvalidPinError(PinwiseError):
-    pass
+    """A pin directory or its pin.yaml is not valid. `where` is the path to report."""
+
+    def __init__(self, message: str, *, where: str) -> None:
+        super().__init__(message)
+        self.where = where
