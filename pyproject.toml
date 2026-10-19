@@ -1,0 +1,99 @@
+[project]
+name = "pinwise"
+version = "0.1.0"
+description = "Pin untestable upstream assumptions to the code that rests on them, and check them again in CI."
+authors = [{ name = "Nagato Yuzuru", email = "nagato@yuzuru.me" }]
+requires-python = ">=3.14"
+dependencies = [
+  "ast-grep-cli>=0.50.0",
+  "pydantic>=2.14.0",
+  "pyyaml>=6.0.3",
+  "unidiff>=1.0.1",
+]
+
+[project.scripts]
+pinwise = "pinwise.cli:main"
+
+[build-system]
+requires = ["hatchling>=1.32"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "tests"]
+
+[dependency-groups]
+dev = [
+  "git-cliff>=2.14.2",
+  "jactionlint>=2.2.0",
+  "jsonschema>=4.26.0",
+  "prek>=0.5.5",
+  "pytest>=9.1.1",
+  "ruff>=0.17.0",
+  "ty>=0.0.86",
+]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+preview = true
+explicit-preview-rules = true # only named preview rules activate
+select = [
+  "C901",    # mccabe complexity
+  "PLR1702", # too-many-nested-blocks (preview)
+  "D",       # pydocstyle — format only, presence rules ignored below
+  "DOC501",  # raised exception missing from existing docstring (preview)
+  "E",       # pycodestyle errors (incl. E722 bare except)
+  "F",       # pyflakes
+  "UP",      # pyupgrade — version-gated modernization, driven by target/requires-python
+  "I",       # isort
+  "B",       # bugbear (B006 mutable defaults, B904 raise-from)
+  "SIM",     # simplify
+  "C4",      # comprehensions
+  "RUF",     # ruff-native
+  "A",       # builtins shadowing
+  "T20",     # no print in app code
+  "PIE",     # misc lints
+  "PLC",     # pylint convention (incl. PLC0415 import-outside-top-level)
+  "PLE",     # pylint error
+  "PERF",    # perflint (manual accumulator loops)
+  "FURB",    # refurb modernization
+  "PTH",     # pathlib over os.path
+  "DTZ",     # naive datetime
+  "ASYNC",   # blocking calls in async
+  "BLE",     # blind except
+  "S110",    # try-except-pass
+  "S112",    # try-except-continue
+  "PGH004",  # blanket noqa
+  "TRY002",  # raise vanilla Exception
+  "G",       # no interpolation in log calls
+  "LOG",     # logger acquisition/usage
+  "TD006",   # TODO spelled in capitals
+  "FIX003",  # XXX, the non-canonical spelling of WARN
+]
+ignore = ["D1"] # docstring presence is judgment, not lint
+fixable = ["ALL"]
+unfixable = ["T20"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.mccabe]
+max-complexity = 12
+
+[tool.ruff.lint.flake8-bandit]
+check-typed-exception = true # flag typed except-pass too
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["T20", "S101"]
+"__init__.py" = ["F401"]
+"scripts/**" = ["T20"]
+
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.uv]
+required-version = ">=0.13"
+# jactionlint 2.2.0 is its first PyPI upload. A fixed date admits only that release before the cooldown ends.
+exclude-newer-package = { jactionlint = "2026-10-14T16:00:00Z" }
